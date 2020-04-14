@@ -6,6 +6,8 @@ import (
 	"log"
 	"fmt"
 	"strings"
+	oidc "github.com/coreos/go-oidc"
+	"context"
 )
 
 func main() {
@@ -22,10 +24,38 @@ func main() {
 	}
 }
 
+func getBearerToken(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	tok := strings.ReplaceAll(auth, "Bearer", "")
+	return strings.TrimSpace(tok)
+}
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	builder := strings.Builder{}
+	if val := r.URL.Query().Get("googleoidc"); len(val) >= 0 {
+		ctx := context.Background()
+		provider, err := oidc.NewProvider(ctx, "https://accounts.google.com")
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = fmt.Fprintf(w, err.Error())
+			return
+		}
+		verifier := provider.Verifier(&oidc.Config{ClientID: "/"})
+		var token string
+		if val := r.URL.Query().Get("tok"); len(val) > 0 {
+			token = val
+		} else {
+			token = getBearerToken(r)
+		}
+		tokVer, err := verifier.Verify(ctx, token)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = fmt.Fprintf(w, err.Error())
+			return
+		}
+		builder.WriteString(fmt.Sprintf("token detail: %+v \n\n", tokVer))
+	}
+	w.WriteHeader(http.StatusOK)
 	_, _ = builder.WriteString("headers for this request:\n\n")
 	for key, val := range r.Header {
 		vals := strings.Join(val, " ")
