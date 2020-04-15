@@ -41,7 +41,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			_, _ = fmt.Fprintf(w, err.Error())
 			return
 		}
-		verifier := provider.Verifier(&oidc.Config{ClientID: "/"})
+		verifier := provider.Verifier(&oidc.Config{
+			ClientID: r.URL.Path,
+			SkipClientIDCheck: false,
+			SkipExpiryCheck: false,
+			SkipIssuerCheck: false,
+		})
 		var token string
 		if val := r.URL.Query().Get("tok"); len(val) > 0 {
 			token = val
